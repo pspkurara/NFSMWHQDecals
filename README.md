@@ -126,5 +126,4 @@ way to get it, has to go with it, and a modified version has to be released unde
 
 ## Links
 
-- Download: https://github.com/pspkurara/NFSMWHQDecals/releases/tag/v1.0.0
-- Source: https://github.com/pspkurara/NFSMWHQDecals
+- Download: https://github.com/pspkurara/NFSMWHQDecals/releases

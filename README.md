@@ -17,12 +17,12 @@ It works on speed.exe 1.3 only (the 32-bit PC executable) and it does not change
 
 ## Requirement
 
-- Need For Speed Most Wanted for Windows (speed.exe 3.2)
+- Need For Speed Most Wanted for Windows (speed.exe 1.3)
 - Mod loader (ASI).
 
 ## Install
 
-1. Put `NFSMWHQDecals.asi` and `NFSMWHQDecals.ini` into the `scripts` folder on Modded NFSMW.</br>(example: `C:\Program Files (x86)\Electrinc Arts\Need For Speed Most Wanted\scripts` )
+1. Put `NFSMWHQDecals.asi` and `NFSMWHQDecals.ini` into the `scripts` folder on Modded NFSMW.<br>(example: `C:\Program Files (x86)\Electronic Arts\Need For Speed Most Wanted\scripts` )
 2. Adjust the appearance of the decals via the .ini file if necessary.
 3. Run `speed.exe`.
 4. Enjoy!

@@ -15,12 +15,17 @@ set `HotReload=1`, the INI is read again every second, so you can try the looks 
 
 It works on speed.exe 1.3 only (the 32-bit PC executable) and it does not change any game file.
 
+## Requirement
+
+- Need For Speed Most Wanted for Windows (speed.exe 3.2)
+- Mod loader (ASI).
+
 ## Install
 
-Unzip into the game folder, or put `scripts/NFSMWHQDecals.asi` and `scripts/NFSMWHQDecals.ini` into the game's `scripts` folder. You
-need an ASI loader and speed.exe 1.3. Start the game once and the INI is written next to the ASI if it is missing.
-
-To remove it, delete the `.asi`, the INI and the log.
+1. Put `NFSMWHQDecals.asi` and `NFSMWHQDecals.ini` into the `scripts` folder on Modded NFSMW.</br>(example: `C:\Program Files (x86)\Electrinc Arts\Need For Speed Most Wanted\scripts` )
+2. Adjust the appearance of the decals via the .ini file if necessary.
+3. Run `speed.exe`.
+4. Enjoy!
 
 ## Settings
 

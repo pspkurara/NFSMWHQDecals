@@ -1,0 +1,10 @@
+# Build output
+/build/
+
+# Local logs and notes
+*.log
+
+# Editor and OS files
+.vs/
+*.user
+Thumbs.db

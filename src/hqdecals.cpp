@@ -141,6 +141,7 @@ void loadIni(bool force = false) {
         return;
     }
     g_iniTime = a.ftLastWriteTime;
+    g_cfg = Config{};   // a key that was removed from the INI goes back to its default
     g_cfg.enabled = getB("Main", "Enabled", true);
     g_cfg.log = getB("Main", "Log", false);
     g_cfg.hotReload = getB("Main", "HotReload", false);
@@ -470,6 +471,8 @@ using DipFn = HRESULT(__stdcall*)(IDirect3DDevice9*, D3DPRIMITIVETYPE, INT, UINT
 using PresentFn = HRESULT(__stdcall*)(IDirect3DDevice9*, const RECT*, const RECT*, HWND, const RGNDATA*);
 DipFn g_origDip{};
 PresentFn g_origPresent{};
+using ResetFn = HRESULT(__stdcall*)(IDirect3DDevice9*, D3DPRESENT_PARAMETERS*);
+ResetFn g_origReset{};
 
 // FNV-1a hash of a byte range.
 uint32_t fnv(const void* data, size_t size) {
@@ -584,9 +587,9 @@ float4 main(PSIn i) : COLOR0 {
 )";
 IDirect3DPixelShader9* g_nrmPS = nullptr;
 bool g_nrmPsFailed = false;
-// One normal target per render target size (the game draws the scene and its reflections at different sizes).
+// One normal target per game render target (the game draws the scene and its reflections into different ones).
 struct NrmTarget { IDirect3DTexture9* tex = nullptr; IDirect3DSurface9* surf = nullptr; UINT w = 0, h = 0; uint64_t clearedFrame = ~0ull; };
-std::map<uint64_t, NrmTarget> g_nrmTargets;   // key: width << 32 | height
+std::map<uint64_t, NrmTarget> g_nrmTargets;   // key: address of the game's render target surface
 uint64_t g_frameNo = 0;                       // counts Present calls; a target is cleared on its first use in a frame
 bool g_prepassPending = false;                // dipImpl sets it for an opaque car draw; dipHook then runs the pre-pass after the game's draw
 // Frees the normal targets and shader (used when the device is recreated).
@@ -643,7 +646,12 @@ static void normalPrepass(IDirect3DDevice9* d, D3DPRIMITIVETYPE type, INT baseVe
         oldRT->Release();
         return;
     }
-    NrmTarget& t = g_nrmTargets[(uint64_t(rd.Width) << 32) | rd.Height];
+    NrmTarget& t = g_nrmTargets[uint64_t(reinterpret_cast<uintptr_t>(oldRT))];
+    if (t.tex && (t.w != rd.Width || t.h != rd.Height)) { // the game freed that surface and the address was reused for another size
+        if (t.surf) t.surf->Release();
+        t.tex->Release();
+        t = NrmTarget{};
+    }
     if (!t.tex) {
         if (FAILED(d->CreateTexture(rd.Width, rd.Height, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &t.tex, nullptr)) || !t.tex ||
             FAILED(t.tex->GetSurfaceLevel(0, &t.surf)) || !t.surf) {
@@ -694,8 +702,9 @@ static NrmTarget* currentNrm(IDirect3DDevice9* d) {
     D3DSURFACE_DESC rd{};
     rt->GetDesc(&rd);
     rt->Release();
-    const auto it = g_nrmTargets.find((uint64_t(rd.Width) << 32) | rd.Height);
-    return (it != g_nrmTargets.end() && it->second.tex && it->second.clearedFrame == g_frameNo) ? &it->second : nullptr;
+    const auto it = g_nrmTargets.find(uint64_t(reinterpret_cast<uintptr_t>(rt)));
+    return (it != g_nrmTargets.end() && it->second.tex && it->second.w == rd.Width && it->second.h == rd.Height &&
+            it->second.clearedFrame == g_frameNo) ? &it->second : nullptr;
 }
 HRESULT dipImpl(IDirect3DDevice9* d, D3DPRIMITIVETYPE type, INT baseVertex, UINT minIdx, UINT numVerts, UINT start, UINT prims);
 // Hook of DrawIndexedPrimitive. dipImpl does the work; this adds the normal pre-pass after an opaque car draw and measures the cost.
@@ -870,6 +879,13 @@ HRESULT dipImpl(IDirect3DDevice9* d, D3DPRIMITIVETYPE type, INT baseVertex, UINT
     return hr;
 }
 
+// Hook of Reset (resolution or window mode change, lost device). Direct3D 9 refuses a Reset while default-pool resources
+// exist, so the normal targets are freed first. They are created again on the next car draw.
+HRESULT __stdcall resetHook(IDirect3DDevice9* d, D3DPRESENT_PARAMETERS* pp) {
+    releaseNrm();
+    return g_origReset(d, pp);
+}
+
 // Hook of Present: once per frame. Handles device changes, the periodic log line, HotReload, and clears the per-frame tables.
 HRESULT __stdcall presentHook(IDirect3DDevice9* d, const RECT* a, const RECT* b, HWND w, const RGNDATA* r) {
     static uint64_t frame = 0;
@@ -923,10 +939,11 @@ DWORD WINAPI worker(LPVOID) {
     dev = *reinterpret_cast<IDirect3DDevice9**>(kDevicePtr);
     if (!dev || MH_Initialize() != MH_OK) return 0;
     void** table = *reinterpret_cast<void***>(dev);
-    // Hook the functions inside d3d9.dll (index 82 = DrawIndexedPrimitive, 17 = Present), not the device's vtable slots,
+    // Hook the functions inside d3d9.dll (index 82 = DrawIndexedPrimitive, 17 = Present, 16 = Reset), not the device's vtable slots,
     // because other mods overwrite those slots.
     MH_CreateHook(table[82], reinterpret_cast<void*>(&dipHook), reinterpret_cast<void**>(&g_origDip));
     MH_CreateHook(table[17], reinterpret_cast<void*>(&presentHook), reinterpret_cast<void**>(&g_origPresent));
+    MH_CreateHook(table[16], reinterpret_cast<void*>(&resetHook), reinterpret_cast<void**>(&g_origReset));
     MH_CreateHook(reinterpret_cast<void*>(0x7387E0), reinterpret_cast<void*>(&partHook), reinterpret_cast<void**>(&g_origPart));
     MH_CreateHook(reinterpret_cast<void*>(0x6E0AB0), reinterpret_cast<void*>(&submitHook), reinterpret_cast<void**>(&g_origSubmit));
     const MH_STATUS st = MH_EnableHook(MH_ALL_HOOKS);

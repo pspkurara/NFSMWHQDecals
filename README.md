@@ -112,7 +112,7 @@ of a release.
 
 ## Changelog
 
-See `CHANGELOG.md`. 1.0.0 is the first release.
+See `CHANGELOG.md`.
 
 ## Credits
 

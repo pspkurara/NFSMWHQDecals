@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.1 - 2026-11-24
+
+- Fixed: changing the screen mode while using REDUX could make the game's Reset fail, because the extra normal targets were not
+  freed first. They are now freed before every Reset.
+- Fixed: the normal targets are now kept per render target, not per size, so two targets of the same size no longer share one.
+- Fixed: with `HotReload`, a key that you delete from the INI goes back to its default value.
+
 ## 1.0.0 - 2026-11-21
 
 First release.
